@@ -124,7 +124,6 @@ This page sends only the script. It does not offer comic style, duration, charac
 ```
 streamlit>=1.45.0
 google-generativeai>=0.8.5
-streamlit-option-menu>=0.3.13
 python-dotenv>=1.0.1
 Pillow>=10.3.0
 requests>=2.32.3

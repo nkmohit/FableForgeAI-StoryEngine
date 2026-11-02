@@ -42,7 +42,6 @@ def install_pip_packages():
     
     packages = [
         "streamlit>=1.45.0",
-        "streamlit-option-menu>=0.4.0", 
         "python-dotenv>=1.0.0",
         "Pillow>=10.0.0",
         "requests>=2.32.0",

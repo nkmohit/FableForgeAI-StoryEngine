@@ -1,0 +1,42 @@
+# Calm, neutral theme. One near-black accent; no injected CSS.
+[theme]
+base = "light"
+primaryColor = "#171717"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f4f4f5"
+textColor = "#171717"
+linkColor = "#171717"
+borderColor = "#e4e4e7"
+codeBackgroundColor = "#f4f4f5"
+grayColor = "#71717a"
+grayTextColor = "#52525b"
+redColor = "#b42318"
+greenColor = "#067647"
+orangeColor = "#b54708"
+yellowColor = "#a15c07"
+blueColor = "#175cd3"
+violetColor = "#3f3f46"
+
+font = "sans-serif"
+baseFontSize = 16
+baseFontWeight = 400
+headingFontSizes = ["1.75rem", "1.25rem", "1.125rem", "1rem", "0.9375rem", "0.875rem"]
+headingFontWeights = [600, 600, 550, 550, 500, 500]
+baseRadius = "0.375rem"
+buttonRadius = "0.375rem"
+showWidgetBorder = true
+showSidebarBorder = true
+linkUnderline = false
+paddingTop = "1.75rem"
+paddingBottom = "3rem"
+
+[theme.sidebar]
+backgroundColor = "#fafafa"
+secondaryBackgroundColor = "#f4f4f5"
+textColor = "#171717"
+grayTextColor = "#52525b"
+primaryColor = "#171717"
+linkColor = "#171717"
+borderColor = "#e4e4e7"
+paddingTop = "0.75rem"
+paddingBottom = "1.5rem"
