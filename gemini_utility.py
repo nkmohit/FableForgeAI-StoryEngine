@@ -7,34 +7,60 @@ import google.generativeai as genai
 # Load environment variables
 load_dotenv()
 
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+# README and the Streamlit app use GEMINI_API_KEY. GOOGLE_API_KEY remains a fallback.
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+DEFAULT_MODEL = "gemini-2.0-flash"
+FALLBACK_MODEL = "gemini-1.5-flash"
 
 # Configure Google.generativeai with API key
-genai.configure(api_key=GOOGLE_API_KEY)
+genai.configure(api_key=GEMINI_API_KEY)
 
-def load_gemini_pro_model():
-    """Load the latest Gemini 2.0 Flash model for better performance"""
+def build_generation_config(temperature=None, max_output_tokens=None):
+    """Map UI settings onto Gemini generation parameters.
+
+    Returns None when both values are omitted so the SDK keeps its defaults.
+    A temperature of 0.0 is a real setting and must be forwarded.
+    """
+    config = {}
+    if temperature is not None:
+        config["temperature"] = float(temperature)
+    if max_output_tokens is not None:
+        config["max_output_tokens"] = int(max_output_tokens)
+    return config or None
+
+def _generation_kwargs(temperature=None, max_output_tokens=None, stream=False):
+    kwargs = {}
+    config = build_generation_config(temperature, max_output_tokens)
+    if config:
+        kwargs["generation_config"] = config
+    if stream:
+        kwargs["stream"] = True
+    return kwargs
+
+def load_gemini_pro_model(model_name=DEFAULT_MODEL):
+    """Load a Gemini model for text generation."""
     try:
-        gemini_pro_model = genai.GenerativeModel("gemini-2.0-flash")
-        return gemini_pro_model
+        return genai.GenerativeModel(model_name)
     except Exception as e:
-        # Fallback to 1.5 flash if 2.0 is not available
-        print(f"Warning: Could not load gemini-2.0-flash, falling back to gemini-1.5-flash. Error: {e}")
-        return genai.GenerativeModel("gemini-1.5-flash")
+        print(f"Warning: Could not load {model_name}, falling back to {FALLBACK_MODEL}. Error: {e}")
+        return genai.GenerativeModel(FALLBACK_MODEL)
 
-def load_gemini_pro_vision_model():
-    """Load the latest Gemini vision model"""
+def load_gemini_pro_vision_model(model_name=DEFAULT_MODEL):
+    """Load a Gemini model for image and text prompts."""
     try:
-        return genai.GenerativeModel("gemini-2.0-flash")
+        return genai.GenerativeModel(model_name)
     except Exception as e:
-        print(f"Warning: Could not load gemini-2.0-flash for vision, falling back to gemini-1.5-flash. Error: {e}")
-        return genai.GenerativeModel("gemini-1.5-flash")
+        print(f"Warning: Could not load {model_name} for vision, falling back to {FALLBACK_MODEL}. Error: {e}")
+        return genai.GenerativeModel(FALLBACK_MODEL)
 
-def gemini_pro_vision_response(prompt, image):
+def gemini_pro_vision_response(prompt, image, temperature=None, max_output_tokens=None, model_name=DEFAULT_MODEL):
     """Get response from Gemini Vision model - image/text to text"""
     try:
-        gemini_pro_vision_model = load_gemini_pro_vision_model()
-        response = gemini_pro_vision_model.generate_content([prompt, image])
+        gemini_pro_vision_model = load_gemini_pro_vision_model(model_name)
+        response = gemini_pro_vision_model.generate_content(
+            [prompt, image],
+            **_generation_kwargs(temperature, max_output_tokens),
+        )
         result = response.text
         return result
     except Exception as e:
@@ -67,21 +93,27 @@ def embeddings_model_response(input_text):
         except Exception as fallback_e:
             return f"Error generating embeddings: {str(fallback_e)}"
 
-def gemini_pro_response(user_prompt):
+def gemini_pro_response(user_prompt, temperature=None, max_output_tokens=None, model_name=DEFAULT_MODEL):
     """Get response from Gemini model - text to text"""
     try:
-        gemini_pro_model = load_gemini_pro_model()
-        response = gemini_pro_model.generate_content(user_prompt)
+        gemini_pro_model = load_gemini_pro_model(model_name)
+        response = gemini_pro_model.generate_content(
+            user_prompt,
+            **_generation_kwargs(temperature, max_output_tokens),
+        )
         result = response.text
         return result
     except Exception as e:
         return f"Error generating response: {str(e)}"
 
-def gemini_stream_response(user_prompt):
+def gemini_stream_response(user_prompt, temperature=None, max_output_tokens=None, model_name=DEFAULT_MODEL):
     """Get streaming response from Gemini model"""
     try:
-        gemini_pro_model = load_gemini_pro_model()
-        response = gemini_pro_model.generate_content(user_prompt, stream=True)
+        gemini_pro_model = load_gemini_pro_model(model_name)
+        response = gemini_pro_model.generate_content(
+            user_prompt,
+            **_generation_kwargs(temperature, max_output_tokens, stream=True),
+        )
         return response
     except Exception as e:
         return f"Error generating streaming response: {str(e)}"
