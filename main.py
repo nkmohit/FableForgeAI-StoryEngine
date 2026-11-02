@@ -12,15 +12,17 @@ from gemini_utility import (
     embeddings_model_response,
     gemini_stream_response,
     get_available_models,
-    check_api_key
+    check_api_key,
+    build_generation_config,
 )
 from gradio_client import Client
 
 # Load environment variables from .env file
 load_dotenv()
 
-# Accessing the API keys from environment variables
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+# Accessing the API keys from environment variables.
+# GEMINI_API_KEY is the documented name; GOOGLE_API_KEY still works.
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
 HUGGINGFACE_API_KEY = os.getenv("HUGGINGFACE_API_KEY")
 
 working_dir = os.path.dirname(os.path.abspath(__file__))
@@ -86,7 +88,7 @@ st.markdown("""
 
 # Check API key on startup
 if not GEMINI_API_KEY:
-    st.error("🔑 Google API Key not found! Please set your GEMINI_API_KEY in the .env file.")
+    st.error("🔑 Gemini API key not found! Set GEMINI_API_KEY (or GOOGLE_API_KEY) in the .env file.")
     st.stop()
 
 # Initialize session state
@@ -131,7 +133,7 @@ with st.sidebar:
     
     st.markdown("---")
     
-    # Model selection
+    # Model selection. Passed into every Gemini call below.
     available_models = get_available_models()
     selected_model = st.selectbox(
         "🎯 Select AI Model",
@@ -139,10 +141,18 @@ with st.sidebar:
         help="Choose the AI model for content generation"
     )
     
-    # Settings section
+    # Settings section. Both values are sent on each Gemini request.
     with st.expander("⚙️ Settings"):
         temperature = st.slider("Temperature", 0.0, 1.0, 0.7, help="Controls randomness in responses")
         max_tokens = st.slider("Max Tokens", 100, 2048, 1000, help="Maximum response length")
+
+def gemini_call_kwargs():
+    """Sidebar settings that every Gemini request should honor."""
+    return {
+        "temperature": temperature,
+        "max_output_tokens": max_tokens,
+        "model_name": selected_model,
+    }
 
 # Function to translate roles between Gemini-Pro and Streamlit terminology
 def translate_role_for_streamlit(user_role):
@@ -175,11 +185,15 @@ def text2speech(text):
 
 # Enhanced ChatBot page
 if selected == '🤖 ChatBot':
-    model = load_gemini_pro_model()
+    model = load_gemini_pro_model(selected_model)
 
-    # Initialize chat session in Streamlit if not already present
-    if "chat_session" not in st.session_state:  
+    # Recreate the chat when the selected model changes so the dropdown takes effect.
+    if (
+        "chat_session" not in st.session_state
+        or st.session_state.get("chat_model") != selected_model
+    ):
         st.session_state.chat_session = model.start_chat(history=[])
+        st.session_state.chat_model = selected_model
 
     # Display the chatbot's title on the page
     st.title("🤖 Enhanced AI ChatBot")
@@ -238,7 +252,7 @@ if selected == '🤖 ChatBot':
                     response_text = ""
                     
                     try:
-                        response = gemini_stream_response(user_prompt)
+                        response = gemini_stream_response(user_prompt, **gemini_call_kwargs())
                         for chunk in response:
                             if hasattr(chunk, 'text'):
                                 response_text += chunk.text
@@ -257,7 +271,10 @@ if selected == '🤖 ChatBot':
                 else:
                     # Regular response
                     try:
-                        gemini_response = st.session_state.chat_session.send_message(user_prompt)
+                        gemini_response = st.session_state.chat_session.send_message(
+                            user_prompt,
+                            generation_config=build_generation_config(temperature, max_tokens),
+                        )
                         st.markdown(gemini_response.text)
                     except Exception as e:
                         st.error(f"❌ Error: {str(e)}")
@@ -329,7 +346,7 @@ elif selected == '📚 Story Generator':
                     Make the story engaging, creative, and well-structured.
                     """
                     
-                    story = gemini_pro_vision_response(prompt, image)
+                    story = gemini_pro_vision_response(prompt, image, **gemini_call_kwargs())
                     
                     # Display results
                     col1, col2 = st.columns([1, 1])
@@ -384,7 +401,7 @@ elif selected == '📚 Story Generator':
                     Make it engaging and include a meaningful conclusion.
                     """
                     
-                    story = gemini_pro_response(prompt)
+                    story = gemini_pro_response(prompt, **gemini_call_kwargs())
                     
                     st.subheader("📚 Your Generated Story")
                     st.write(story)
@@ -415,14 +432,20 @@ elif selected == '📚 Story Generator':
             
             if st.button(f"🎭 Generate {poem_style} Poem"):
                 prompt = f"Write a {poem_style.lower()} poem about {theme} with a {mood.lower()} mood. Length: {length.lower()}"
-                result = gemini_pro_response(prompt)
+                result = gemini_pro_response(prompt, **gemini_call_kwargs())
                 st.write(result)
         
         # Add similar sections for other writing types...
 
-# Enhanced Comic Video Generator page
+# Comic Video Generator page.
+# client.predict sends only the script, so style, duration, character, and audio
+# controls are not shown.
 elif selected == '🎬 Comic Video Generator':
     st.title("🎬 AI Comic Video Generator")
+    st.caption(
+        "Video generation calls the external Hugging Face Space ADOPLE/Video-Generator-AI. "
+        "This app sends your script and displays the video that Space returns."
+    )
     
     col1, col2 = st.columns([2, 1])
     
@@ -433,39 +456,16 @@ elif selected == '🎬 Comic Video Generator':
             placeholder="Enter a detailed story or script for your comic video...",
             height=200
         )
-        
-        # Additional options
-        comic_style = st.selectbox(
-            "🎨 Comic Style",
-            ["Classic Comic", "Manga", "Cartoon", "Realistic", "Abstract"]
-        )
-        
-        video_duration = st.selectbox(
-            "⏱️ Video Duration",
-            ["Short (30s)", "Medium (1min)", "Long (2min)"]
-        )
     
     with col2:
-        st.subheader("⚙️ Generation Settings")
+        st.subheader("👁️ Preview")
         
-        # Preview options
         if st.button("👁️ Preview Story"):
             if user_prompt:
                 enhanced_prompt = f"Enhance this story for comic video: {user_prompt}"
-                enhanced_story = gemini_pro_response(enhanced_prompt)
+                enhanced_story = gemini_pro_response(enhanced_prompt, **gemini_call_kwargs())
                 st.write("**Enhanced Story:**")
                 st.write(enhanced_story)
-        
-        # Character settings
-        with st.expander("👥 Character Settings"):
-            character_count = st.number_input("Number of Characters", 1, 10, 2)
-            art_style = st.selectbox("Art Style", ["2D", "3D", "Mixed"])
-        
-        # Audio settings
-        with st.expander("🎵 Audio Settings"):
-            include_music = st.checkbox("Background Music", True)
-            include_effects = st.checkbox("Sound Effects", True)
-            voice_style = st.selectbox("Narration Voice", ["Male", "Female", "Child", "Robot"])
 
     if st.button("🎬 Generate Comic Video", type="primary"):
         if user_prompt.strip():
@@ -530,7 +530,7 @@ elif selected == '🎯 AI Assistant':
                 else:
                     prompt = f"{task} this text: {user_text}"
                 
-                result = gemini_pro_response(prompt)
+                result = gemini_pro_response(prompt, **gemini_call_kwargs())
                 st.write("**Result:**")
                 st.write(result)
     

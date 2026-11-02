@@ -6,13 +6,13 @@
 [![Gemini](https://img.shields.io/badge/Gemini-2.0%20Flash-4285F4.svg)](https://ai.google.dev/)
 [![Python](https://img.shields.io/badge/Python-3.9+-3776AB.svg)](https://python.org)
 
-An AI-powered storytelling platform built with Streamlit and Google's Gemini models. Create stories, generate comics, chat with AI, and more!
+An AI-powered storytelling platform. The user interface is Streamlit, not Gradio. Chat, stories, and the writing assistant call Google's Gemini models. Comic video generation does not run in this app: it calls the external Hugging Face Space [`ADOPLE/Video-Generator-AI`](https://huggingface.co/spaces/ADOPLE/Video-Generator-AI) and shows the video that Space returns. The `gradio_client` package is only the client for that Space.
 ![FableForge AI Architecture](FableForge-Architecture.png)
 ## ✨ Features
 
 - 🤖 **AI ChatBot** - Intelligent conversations with streaming responses
 - 📚 **Story Generator** - Create stories from images or text prompts  
-- 🎬 **Comic Video Generator** - Transform stories into visual comics
+- 🎬 **Comic Video Generator** - Send a script to an external Hugging Face Space and play the video it returns
 - 🎯 **AI Assistant** - Writing help, grammar check, translation
 - 🎨 **Creative Writing** - Poems, lyrics, character descriptions
 
@@ -96,9 +96,11 @@ The installer will automatically:
 
 ### **Comic Video Generator**
 - Write your story script
-- Select comic style and duration
-- Customize characters and audio settings
-- Generate and download video
+- Optionally preview a Gemini rewrite of that script (uses the sidebar model, temperature, and max tokens)
+- Generate the video. The script is sent to the external Hugging Face Space `ADOPLE/Video-Generator-AI`
+- Download the video that Space returns
+
+This page sends only the script. It does not offer comic style, duration, character, or audio controls, because those values are not passed to the Space.
 
 ### **AI Assistant**
 - **Writing Help**: Improve text, check grammar
@@ -109,14 +111,13 @@ The installer will automatically:
 ## ⚙️ Configuration
 
 ### **Model Settings**
-- Choose from multiple Gemini models
-- Adjust temperature (0.0-1.0) for creativity
-- Set max tokens (100-2048) for response length
+- Choose from multiple Gemini models. The selection is sent with each Gemini request
+- Temperature (0.0–1.0) and max tokens (100–2048) are sent as Gemini `temperature` and `max_output_tokens`
 
 ### **Audio Settings**
-- Text-to-speech generation
-- Multiple voice options
-- High-quality audio output
+- Optional text-to-speech for generated stories
+- Uses the Hugging Face inference API (`facebook/mms-tts-eng`) and requires `HUGGINGFACE_API_KEY`
+- One English voice; there is no voice picker
 
 ## 📋 Requirements
 
@@ -136,10 +137,11 @@ numpy>=1.26.4
 Your `.env` file should contain:
 
 ```env
-# Google Gemini API Key
+# Google Gemini API Key. GEMINI_API_KEY is preferred.
+# If it is unset, the app reads GOOGLE_API_KEY instead.
 GEMINI_API_KEY=your_api_key_here
 
-# Hugging Face API Key (for audio generation)
+# Hugging Face API Key (for story audio)
 HUGGINGFACE_API_KEY=your_token_here
 ```
 
